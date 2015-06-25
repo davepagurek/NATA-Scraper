@@ -1,0 +1,149 @@
+#!/usr/bin/perl
+
+use v5.10;
+use strict;
+use warnings;
+
+use URI;
+use Web::Scraper;
+use Encode;
+use Data::Dumper;
+use File::Fetch;
+use JSON;
+use File::Slurp;
+
+my $round = "novice";
+my $roundTag = "nata2015open";
+my $swivel = '"C:/Program Files/Swivel.exe"';
+my $moviesToCheck = 2;
+my @entrants = qw(
+    TyyobrO
+    dylan
+    AmazingSpin
+    BooneBum
+    Britbau
+    brynimation
+    CarelessShenanigans
+    DocJoshimitsu
+    Emvium
+    Flikkernicht
+    GlassesX7
+    gunboyisawesome
+    HowardWimshurst
+    jlorp
+    LazyModeComics
+    Magnivez
+    MCakeri
+    MihaP
+    Perrobang
+    RebellionFA
+    ryardo12345
+    scottwjsm
+    SirDuckDee
+    SleepDeprivedChicken
+    Spinalpalm
+    sweetcommando
+    TheSilleGuy
+    tontie777
+    TrohPee
+    TyyobrO
+    visedgrub
+    ZazDupree
+);
+
+if ($ARGV[0] eq "parse") {
+    parse();
+} elsif ($ARGV[0] eq "download") {
+    download();
+}
+
+sub parse {
+    my $participants = scraper {
+        process "h3 + ul li", "entrants[]" => "TEXT";
+        result "entrants";
+    };
+
+    my $movieURLs = scraper {
+        process ".movies a", "movies[]" => '@href';
+        result "movies";
+    };
+
+    my $entry = scraper {
+        process ".tags ~ dd a", "tags[]" => "TEXT";
+        process ".podtop h2", "title" => "TEXT";
+        process "#main > script:not([src])", "flashvars[]" => 'RAW';
+    };
+
+    my $videos = {};
+
+    print "Entrants:\n\n";
+    for my $entrant (@entrants) {
+        print "$entrant\n";
+
+        my $urls = $movieURLs->scrape( URI->new("http://$entrant.newgrounds.com/movies/") );
+        my @movies = grep {
+            $roundTag ~~ @{ $_->{tags} || [] }
+        } map {
+            $entry->scrape( URI->new($_) )
+        } splice @{ $urls }, 0, $moviesToCheck;
+
+        if (my $movie = $movies[0]) {
+            for my $flashvars (@{ $movie->{flashvars} }) {
+                $flashvars =~ s/&amp;/&/g;
+                $flashvars =~ s/&lt;/</g;
+                $flashvars =~ s/&gt;/>/g;
+                $flashvars =~ s/&quot;/"/g;
+                $flashvars =~ s|\\/|/|g;
+                ($movie->{video}) = ($flashvars =~ m{"url":"(http://.+?\.(?:mp4|swf|wmv))});
+                last if $movie->{video};
+            }
+
+            print "\t$movie->{title}\n";
+            print "\t$movie->{video}\n" if $movie->{video};
+
+            $videos->{$entrant} = {
+                title => $movie->{title},
+                video => $movie->{video}
+            };
+        } else {
+            print "\tNo entry yet!\n";
+        }
+        print "\n";
+    }
+
+    print "Writing output...";
+    open my $outfile, ">", "entries.json" or die "Can't open entries.json: $!";
+    print $outfile encode_json $videos;
+    close $outfile;
+    print "done!\n";
+}
+
+sub download {
+    my $json_string = read_file("entries.json") or die "Can't read entries.json: $!";
+    my $videos = decode_json $json_string;
+
+    while (my ($entrant, $data) = each %{ $videos }) {
+        print "Downloading entry from $entrant\n";
+
+        my $url = $data->{video};
+        unless ($url) {
+            print "\tNo movie to download.";
+            next;
+        } else {
+            print "\tfrom url $url\n";
+        }
+        my $download = File::Fetch->new(uri => $url);
+        my $path = "";
+
+        if ($url =~ /\.swf$/) {
+            $path = $download->fetch( to => "swf");
+
+            print "\tConverting swf to mp4";
+            qx($swivel $path);
+        } elsif ($url =~ /\.mp4$/) {
+            $path = $download->fetch( to => "mp4");
+        } else {
+            $path = $download->fetch( to => "other");
+        }
+    }
+}
