@@ -3,6 +3,7 @@
 use v5.10;
 use strict;
 use warnings;
+#use autodie;
 
 use URI;
 use Web::Scraper;
@@ -11,45 +12,10 @@ use Data::Dumper;
 use File::Fetch;
 use JSON;
 use File::Slurp;
+use File::pushd;
 
-my $round = "novice";
-my $roundTag = "nata2015open";
-my $swivel = '"C:/Program Files/Swivel.exe"';
-my $moviesToCheck = 2;
-my @entrants = qw(
-    TyyobrO
-    dylan
-    AmazingSpin
-    BooneBum
-    Britbau
-    brynimation
-    CarelessShenanigans
-    DocJoshimitsu
-    Emvium
-    Flikkernicht
-    GlassesX7
-    gunboyisawesome
-    HowardWimshurst
-    jlorp
-    LazyModeComics
-    Magnivez
-    MCakeri
-    MihaP
-    Perrobang
-    RebellionFA
-    ryardo12345
-    scottwjsm
-    SirDuckDee
-    SleepDeprivedChicken
-    Spinalpalm
-    sweetcommando
-    TheSilleGuy
-    tontie777
-    TrohPee
-    TyyobrO
-    visedgrub
-    ZazDupree
-);
+my $config_json = read_file("config.json");
+my $config = decode_json $config_json;
 
 if ($ARGV[0] eq "parse") {
     parse();
@@ -77,15 +43,15 @@ sub parse {
     my $videos = {};
 
     print "Entrants:\n\n";
-    for my $entrant (@entrants) {
+    for my $entrant (@{ $config->{entrants} }) {
         print "$entrant\n";
 
         my $urls = $movieURLs->scrape( URI->new("http://$entrant.newgrounds.com/movies/") );
         my @movies = grep {
-            $roundTag ~~ @{ $_->{tags} || [] }
+            $config->{roundTag} ~~ @{ $_->{tags} || [] }
         } map {
             $entry->scrape( URI->new($_) )
-        } splice @{ $urls }, 0, $moviesToCheck;
+        } splice @{ $urls }, 0, $config->{moviesToCheck};
 
         if (my $movie = $movies[0]) {
             for my $flashvars (@{ $movie->{flashvars} }) {
@@ -138,8 +104,8 @@ sub download {
         if ($url =~ /\.swf$/) {
             $path = $download->fetch( to => "swf");
 
-            print "\tConverting swf to mp4";
-            qx($swivel $path);
+            print "\tConverting swf to mp4\n\t$path\n";
+            system($config->{swivel}, $path);
         } elsif ($url =~ /\.mp4$/) {
             $path = $download->fetch( to => "mp4");
         } else {
