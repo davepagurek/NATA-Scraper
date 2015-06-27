@@ -5,11 +5,13 @@ Maintaining the Newgrounds Annual Tournament of Animation site is hard. Let's au
 ```
 ./nata parse
 ./nata download
+./nata convert
 ```
 or
 ```
 perl nata parse
 perl nata download
+perl nata convert
 ```
 Change `$round` to scrape `http://www.ngtournament.com/$round` for the entrant list.
 
