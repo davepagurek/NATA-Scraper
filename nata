@@ -27,6 +27,11 @@ if ($ARGV[0]) {
         convert();
     } elsif ($ARGV[0] eq "screenshots") {
         screenshots();
+    } elsif ($ARGV[0] eq "run") {
+        parse();
+        download();
+        convert();
+        screenshots();
     } else {
         show_help();
     }
