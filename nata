@@ -147,7 +147,6 @@ sub download {
     print $outfile to_json($to_convert, {pretty => 1});
     close $outfile;
     print "done!\n";
-    print "Still waiting on:\n";
 }
 
 sub convert {
