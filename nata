@@ -108,7 +108,6 @@ sub download {
         my $url = $data->{video};
         unless ($url) {
             print "\tNo movie to download.";
-            push(@{$waiting_on}, $entrant);
             next;
         } else {
             print "\tfrom url $url\n";
