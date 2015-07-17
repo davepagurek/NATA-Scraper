@@ -1,6 +1,9 @@
 mp4/
 swf/
 other/
+screenshots/
+entries.json
+to_convert.json
 /blib/
 /.build/
 _build/

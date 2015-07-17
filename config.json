@@ -1,6 +1,6 @@
 {
-    "roundTag": "nata2015open",
-    "moviesToCheck": "2",
+    "roundTag": "nata2015novice",
+    "moviesToCheck": "1",
     "entrants": [
         "TyyobrO",
         "dylan",
@@ -35,6 +35,7 @@
         "visedgrub",
         "ZazDupree"
     ],
-    "swivel": "C:/Program Files/Swivel/Swivel.exe"
+    "swivel": "C:/Program Files/Swivel/Swivel.exe",
+    "ffmpeg": "ffmpeg"
 }
 

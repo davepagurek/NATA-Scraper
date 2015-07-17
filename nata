@@ -13,6 +13,7 @@ use File::Fetch;
 use JSON;
 use File::Slurp;
 use File::pushd;
+use Cwd;
 
 my $config_json = read_file("config.json");
 my $config = decode_json $config_json;
@@ -23,11 +24,14 @@ if ($ARGV[0] eq "parse") {
     download();
 } elsif ($ARGV[0] eq "convert") {
     convert();
+} elsif ($ARGV[0] eq "screenshots") {
+    screenshots();
 } else {
     print "Usage:
     perl nata parse
     perl nata download
-    perl nata convert\n";
+    perl nata convert
+    perl nata screenshots\n";
 }
 
 sub parse {
@@ -67,7 +71,7 @@ sub parse {
                 $flashvars =~ s/&gt;/>/g;
                 $flashvars =~ s/&quot;/"/g;
                 $flashvars =~ s|\\/|/|g;
-                ($movie->{video}) = ($flashvars =~ m{"url":"(http://.+?\.(?:mp4|swf|wmv))});
+                ($movie->{video}) = ($flashvars =~ m{"url":"(http://.+?\.(?:mp4|swf|wmv|mov))});
                 last if $movie->{video};
             }
 
@@ -79,6 +83,7 @@ sub parse {
                 video => $movie->{video}
             };
         } else {
+            $videos->{$entrant} = {};
             print "\tNo entry yet!\n";
         }
         print "\n";
@@ -103,6 +108,7 @@ sub download {
         my $url = $data->{video};
         unless ($url) {
             print "\tNo movie to download.";
+            push(@{$waiting_on}, $entrant);
             next;
         } else {
             print "\tfrom url $url\n";
@@ -115,6 +121,10 @@ sub download {
             $to_convert->{$entrant} = $path;
         } elsif ($url =~ /\.mp4$/) {
             $path = $download->fetch( to => "mp4");
+            my $renamed = $path;
+            $renamed =~ s{(\/|\\)[\w\d_]+?\.mp4}{$1$entrant.mp4};
+            print "\trenaming to $renamed\n";
+            rename($path, $renamed);
         } else {
             $path = $download->fetch( to => "other");
         }
@@ -124,7 +134,8 @@ sub download {
     open my $outfile, ">", "to_convert.json" or die "Can't open to_convert.json: $!";
     print $outfile encode_json $to_convert;
     close $outfile;
-    print "done!\n"
+    print "done!\n";
+    print "Still waiting on:\n";
 }
 
 sub convert {
@@ -133,6 +144,7 @@ sub convert {
 
 
     while (my ($entrant, $path) = each %{ $to_convert }) {
+        next if -e "mp4/$entrant.mp4";
         print "Converting swf to mp4 for $entrant\n";
         system($config->{swivel}, $path,
             "-s" => "1280x720",
@@ -140,4 +152,44 @@ sub convert {
         );
     }
     print "Done!\n";
+}
+
+sub screenshots {
+    opendir (my $videos, "mp4") or die "Couldn't read videos directory: $!";
+    while (my $video = readdir($videos)) {
+        next if $video =~ /^\./;
+        my ($entrant) = $video =~ /([\w-]+)\.mp4/;
+        print "Making screenshots for $video:\n";
+        make_screenshots($entrant, "./mp4/$video");
+    }
+}
+
+sub make_screenshots {
+    my ($entrant, $video) = @_;
+    my ($hrs_range, $min_range, $sec_range);
+    my $ffmpeg = $config->{ffmpeg};
+    my $duration = `$ffmpeg -i "$video" 2>&1`;
+    if ($duration =~ /Duration: (\d{2}):(\d{2}):(\d{2})/) {
+        ($hrs_range, $min_range, $sec_range) = ($1, $2, $3);
+    } else {
+        print "Duration parse error for $video: $duration\n";
+        return;
+    }
+
+    mkdir("screenshots") unless (-d "screenshots");
+
+    for my $i (1..3) {
+        my $hrs = int(rand($hrs_range));
+        my $min = ($hrs == $hrs_range) ? int(rand($min_range)) : int(rand(60));
+        my $sec = ($hrs == $hrs_range && $min == $min_range) ?
+        int(rand($sec_range)) : int(rand(60));
+
+        print "\tCreating screenshot $i\n";
+        `$ffmpeg -ss $hrs:$min:$sec -t 1 -i "$video" -f mjpeg "screenshots/$entrant.$i.jpg"`;
+
+        if ($! || !( -e "screenshots/$entrant.$i.jpg" )) {
+           print "Error making screenshot: $!\n";
+           return;
+        }
+    }
 }
