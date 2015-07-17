@@ -18,15 +18,23 @@ use Cwd;
 my $config_json = read_file("config.json");
 my $config = decode_json $config_json;
 
-if ($ARGV[0] eq "parse") {
-    parse();
-} elsif ($ARGV[0] eq "download") {
-    download();
-} elsif ($ARGV[0] eq "convert") {
-    convert();
-} elsif ($ARGV[0] eq "screenshots") {
-    screenshots();
+if ($ARGV[0]) {
+    if ($ARGV[0] eq "parse") {
+        parse();
+    } elsif ($ARGV[0] eq "download") {
+        download();
+    } elsif ($ARGV[0] eq "convert") {
+        convert();
+    } elsif ($ARGV[0] eq "screenshots") {
+        screenshots();
+    } else {
+        show_help();
+    }
 } else {
+    show_help();
+}
+
+sub show_help {
     print "Usage:
     perl nata parse
     perl nata download
@@ -91,7 +99,7 @@ sub parse {
 
     print "Writing output...";
     open my $outfile, ">", "entries.json" or die "Can't open entries.json: $!";
-    print $outfile encode_json $videos;
+    print $outfile to_json($videos, {pretty => 1});
     close $outfile;
     print "done!\n";
 }
@@ -131,7 +139,7 @@ sub download {
 
     print "Writing output...";
     open my $outfile, ">", "to_convert.json" or die "Can't open to_convert.json: $!";
-    print $outfile encode_json $to_convert;
+    print $outfile to_json($to_convert, {pretty => 1});
     close $outfile;
     print "done!\n";
     print "Still waiting on:\n";
